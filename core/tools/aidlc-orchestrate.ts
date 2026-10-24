@@ -656,6 +656,7 @@ import {
 import { VALID_DEPTHS, VALID_TEST_STRATEGIES } from "./aidlc-guard-switch.ts";
 import { markSwitchOffNoticesSaid, type SwitchOffNotice, switchOffNotices } from "./aidlc-recorded-switches.ts";
 import { kiroHooksOffNotices, markKiroHooksOffSaid } from "./aidlc-kiro-hooks-off.ts";
+import { deepFolder } from "./aidlc-folder-depth.ts";
 import {
   readRuleBundle,
   restoreSpacePhaseRules,
@@ -18875,8 +18876,19 @@ function handleReport(args: string[], projectDir: string | undefined): void {
         // after what the stage produced: the narration is the person's line
         // (the produced sentence stays whole), and the change lines stay what
         // changed.
-        const narration = [line, leftOutNotice(pd, node, unit), failedCheckNotices(pd, node, unit).join(" ")]
-          .filter(Boolean).join("\n");
+        // On Windows, the Unit names Units Generation just wrote deepen their
+        // records past what config counted: config's line, said once, the first
+        // time this gate opens.
+        const dag = slug === "units-generation" && flags.result === "awaiting-approval" && !revalidatingOpenGate
+          ? resolveBoltDag(pd)
+          : null;
+        const deepUnits = dag?.state === "ok" ? deepFolder(pd, process.platform, dag.units)?.note : undefined;
+        const narration = [
+          line,
+          leftOutNotice(pd, node, unit),
+          failedCheckNotices(pd, node, unit).join(" "),
+          deepUnits,
+        ].filter(Boolean).join("\n");
         if (narration) gateReply.narration = narration;
         addReviewCheckOffer(gateReply, pd, node, unit);
         addContextParkOffer(gateReply, pd);
