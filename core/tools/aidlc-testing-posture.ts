@@ -41,6 +41,9 @@ import {
   legacyBoltName,
   legacyWorktreePath,
   maximalAttemptEvents,
+  mainCheckoutChangeAllowed,
+  mainCheckoutChangeAskedKey,
+  mainCheckoutChangesAsked,
   onlyAidlcFilesChangedInSwarmStage,
   LEGACY_PLAN_APPROVAL_RECOVERY_CHOICE,
   clearPlanApprovalChallenge,
@@ -4922,23 +4925,31 @@ function approvedWorktreeSource(
   // and says it in one line. So is source that moved after the engine built a
   // plan with plan approval off (a skipped receipt): nobody approved it, and
   // `next` would never ask. An AI-DLC update the person took moves only
-  // AI-DLC's own files, which is no reason to approve the plan again.
+  // AI-DLC's own files, which is no reason to approve the plan again, and
+  // neither are files the person asked to change (swarm allow-change).
   if (
     !approved.continuing &&
     approved.receipt.skipped === undefined &&
     !sameWorkspaceSource(approved.receipt.certifiedSourceSha256, parentSource.fingerprint) &&
     !guardPolicyAcceptsChanges(parent) &&
-    !onlyAidlcFilesChangedInSwarmStage(parent, CODE_GENERATION_STAGE, parentSource)
+    !onlyAidlcFilesChangedInSwarmStage(parent, CODE_GENERATION_STAGE, parentSource) &&
+    mainCheckoutChangeAllowed(parent, workspaceSourceChangedPaths(
+      parent, CODE_GENERATION_STAGE, approved.receipt.certifiedSourceSha256, parentSource, true,
+    )) === null
   ) {
     throw new Error("Parent source has changed since Plan Approval or cannot be bound. Re-present and approve the plan against the current parent source.");
   }
   // AI-DLC's own files are no Unit's source: a worktree need not reproduce
   // them, so an update the person took need not be committed first. Nor is
   // what a link leads to outside the project, or to nothing: no commit holds
-  // it, and the link itself is still compared.
+  // it, and the link itself is still compared. Nor are the files the person
+  // asked to change while the Units are built (swarm allow-change): the
+  // landings keep them in the main checkout as they are.
   const owned = aidlcOwnedSourceKey(parent);
+  const asked = mainCheckoutChangeAskedKey(mainCheckoutChangesAsked(parent));
   const theirs = (listing: ReadonlyMap<string, string>): string => serializeSourceListing(
-    new Map([...listing].filter(([key]) => !owned(`${repo.repo ?? ""}${key}`) && !isLinkTargetListingKey(listing, key))),
+    new Map([...listing].filter(([key]) =>
+      !owned(`${repo.repo ?? ""}${key}`) && !isLinkTargetListingKey(listing, key) && !asked(`${repo.repo ?? ""}${key}`))),
   );
   const prefix = `${repo.repo ?? ""}\0`;
   const expected = new Map([...parentSource.listing]
