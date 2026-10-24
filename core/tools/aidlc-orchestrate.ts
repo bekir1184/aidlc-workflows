@@ -18876,7 +18876,7 @@ function handleReport(args: string[], projectDir: string | undefined): void {
         // after what the stage produced: the narration is the person's line
         // (the produced sentence stays whole), and the change lines stay what
         // changed.
-        // On Windows, the Unit names Units Generation just wrote deepen their
+        // On Windows, the Unit names Units Generation just wrote can deepen their
         // records past what config counted: config's line, said once, the first
         // time this gate opens.
         const dag = slug === "units-generation" && flags.result === "awaiting-approval" && !revalidatingOpenGate
