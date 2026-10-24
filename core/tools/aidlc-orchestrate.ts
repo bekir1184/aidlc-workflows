@@ -18882,7 +18882,9 @@ function handleReport(args: string[], projectDir: string | undefined): void {
         const dag = slug === "units-generation" && flags.result === "awaiting-approval" && !revalidatingOpenGate
           ? resolveBoltDag(pd)
           : null;
-        const deepUnits = dag?.state === "ok" ? deepFolder(pd, process.platform, dag.units)?.note : undefined;
+        const deepUnits = dag?.state === "ok"
+          ? deepFolder(pd, process.platform, { names: dag.units, recordFolder: engineRelativeRecordDir(pd) })?.note
+          : undefined;
         const narration = [
           line,
           leftOutNotice(pd, node, unit),
