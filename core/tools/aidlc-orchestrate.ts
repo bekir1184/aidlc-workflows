@@ -645,6 +645,7 @@ import {
   fenceMemoryLockRefusal,
   guardPolicyCreationGranted,
   guardPolicyNamed,
+  levelsKeptForNextWork,
   planApprovalCreationAsked,
   planApprovalMemoryLockRefusal,
   settingsKeptSince,
@@ -6450,7 +6451,8 @@ function fillApprovedPlanSettings(flags: ParsedFlags, plan: ApprovedComposerPlan
     session = null;
   }
   const request = flags.request ?? null;
-  if (plan.depth && !flags.depth) flags.depth = plan.depth;
+  const levels = levelsKeptForNextWork(projectDir, session, request);
+  if (plan.depth && !flags.depth && levels.depth === undefined) flags.depth = plan.depth;
   const asked = ceremoniesCreationGranted(projectDir, session, request);
   for (const key of CEREMONY_KEYS) {
     const value = plan.settings?.[key];
@@ -6458,7 +6460,7 @@ function fillApprovedPlanSettings(flags: ParsedFlags, plan: ApprovedComposerPlan
     if (key === "plan_approval" ? planApprovalCreationAsked(projectDir, session, request) : asked[key] !== undefined) continue;
     flags.ceremony = { ...flags.ceremony, [key]: value };
   }
-  if (plan.settings?.review && !flags.review) flags.review = plan.settings.review;
+  if (plan.settings?.review && !flags.review && levels.review === undefined) flags.review = plan.settings.review;
   if (plan.guardPolicy && !flags.changeControl && guardPolicyCreationGranted(projectDir, session, request) === null) {
     flags.changeControl = plan.guardPolicy;
   }
