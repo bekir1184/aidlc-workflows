@@ -92,7 +92,7 @@ interface BoltInstance {
 interface SensorFiring {
   id: string;
   fire_id: string;                // 8-hex correlator (four random bytes) the sensor dispatcher stamps on every row of one fire
-  result: "passed" | "failed" | "budget-override" | "incomplete"; // the dispatcher's three terminal rows, plus incomplete for a FIRED row with no terminal (in a still-open window, only once the newest stage-start or sensor row is 60 s past it)
+  result: "passed" | "failed" | "could-not-run" | "budget-override" | "incomplete"; // the dispatcher's four terminal rows, plus incomplete for a FIRED row with no terminal (in a still-open window, only once the newest stage-start or sensor row is 60 s past it)
   ts: string;                     // FIRED row's timestamp
   detail_path?: string;
 }
@@ -512,7 +512,7 @@ main's location. Its lifecycle is:
 - **The lifecycle that triggers compile** — the workflow / phase /
   stage transitions whose audit emits drive the compile hook. See
   [State Machine](12-state-machine.md).
-- **The audit log this graph is derived from** - the 123-event taxonomy
+- **The audit log this graph is derived from** - the 124-event taxonomy
   and the emitter registry. See [State Machine](12-state-machine.md)
   and the User Guide's [State and Audit
   Trail](../guide/10-state-and-audit.md).
