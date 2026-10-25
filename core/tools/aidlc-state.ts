@@ -25,7 +25,7 @@ import {
 } from "node:path";
 import { fileURLToPath } from "node:url";
 import { appendAuditEntry, appendAuditEntryUnlocked } from "./aidlc-audit.ts";
-import { putBackBeforePick } from "./aidlc-before-pick.ts";
+import { putBackBeforePick, sayWritesDuringWork } from "./aidlc-before-pick.ts";
 import {
   approvalDispositionField,
   rejectedFindingDispositionField,
@@ -7663,6 +7663,7 @@ function handleApprove(args: string[]): void {
       error(`Audit emission failed: ${errorMessage(e)}`);
     }
     writeStateFile(pd, content);
+    sayChangedBeforeCodeGeneration(pd, slug);
     console.log(JSON.stringify({
       slug,
       unit: teamGate.unit,
@@ -7857,6 +7858,7 @@ function handleApprove(args: string[]): void {
   }
 
   writeStateFile(pd, content);
+  sayChangedBeforeCodeGeneration(pd, slug);
   if (personCall?.overUnfinishedReview) {
     console.log(JSON.stringify({ change_notices: [unfinishedReviewNotice(stage)] }));
   }
@@ -7879,6 +7881,17 @@ function handleApprove(args: string[]): void {
     handleCompleteWorkflow([slug], validationWarning, personCall);
   }
   });
+}
+
+// The person's files the agent changed while this work was before Code
+// Generation, said once with the way back on the step after this approval
+// (aidlc-before-pick.ts).
+function sayChangedBeforeCodeGeneration(pd: string, slug: string): void {
+  try {
+    sayWritesDuringWork(pd, slug, resolveInvokingSessionId(pd));
+  } catch {
+    // Unsaid: the approval stands.
+  }
 }
 
 // Look up a flag's value while guarding against value-starting-with-"--"
