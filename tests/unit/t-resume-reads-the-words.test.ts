@@ -21,7 +21,7 @@ import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { NATIVE_FIXTURE_SETUP_TIMEOUT_MS } from "../harness/test-budget.ts";
-import { cleanupTestProject, createOrchestrationTestProject, intentsDirOf, seededStateFile } from "../harness/fixtures.ts";
+import { AIDLC_SRC, cleanupTestProject, createOrchestrationTestProject, intentsDirOf, seededStateFile } from "../harness/fixtures.ts";
 import {
   buildState, DISPATCHER, type Directive, env, exec, type Harness, next, ORCHESTRATE, type RunOptions, SECOND_SESSION,
   say,
@@ -72,7 +72,7 @@ function carried(proj: string, step: string): { file: string; words: string } {
 }
 
 async function unpark(proj: string, opts: RunOptions = {}): Promise<void> {
-  const r = await exec([process.execPath, join(proj, ".claude", "tools", "aidlc-state.ts"), "unpark", "--project-dir", proj], {
+  const r = await exec([process.execPath, join(AIDLC_SRC, "tools", "aidlc-state.ts"), "unpark", "--project-dir", proj], {
     cwd: proj, env: env(proj, opts),
   });
   expect(r.status, `${r.stdout}${r.stderr}`).toBe(0);
@@ -287,7 +287,7 @@ describe("on every host's tree", () => {
       expect(r.stdout, r.stderr).toContain(READING);
     });
   }
-  for (const harness of ["claude", "codex", "kiro", "kiro-ide"] as Harness[]) {
+  for (const harness of ["claude", "codex", "kiro-ide"] as Harness[]) {
     test(`${harness}: the person's /aidlc --resume <words>, the agent's bare next --resume: the reading`, async () => {
       const proj = await at("work-open");
       const said = await say(proj, `${harness === "codex" ? "$aidlc" : "/aidlc"} --resume ${WORDS}`, harness);
@@ -298,4 +298,12 @@ describe("on every host's tree", () => {
       expect(r.stdout, r.stderr).toContain(READING);
     });
   }
+  // Kiro CLI's own hook runs the first `next` of a line with --resume itself and hands the agent its reply.
+  test("kiro: the person's /aidlc --resume <words>: the step the hook runs first is the reading", async () => {
+    const proj = await at("work-open");
+    const said = await say(proj, `/aidlc --resume ${WORDS}`, "kiro");
+    expect(said.status, said.stderr).toBe(0);
+    expect(said.stdout, said.stderr).toContain(READING);
+    expect(said.stdout).not.toContain(PICK_UP);
+  });
 });
