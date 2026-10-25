@@ -443,6 +443,8 @@ import {
   swarmWorkerWorktreeMeta,
   scopeCostSummary,
   singleStageAttemptField,
+  keepSingleRunRequest,
+  SINGLE_RUN_REQUEST_FIELD,
   singleStageAttemptIsOpen,
   singleStageAttemptScope,
   defaultScope,
@@ -10732,6 +10734,7 @@ function routeNext(agentArgs: string[], projectDir: string | undefined): void {
         Depth: flags.depth ? VALID_DEPTHS[flags.depth] : undefined,
         "Test Strategy": flags.testStrategy ? VALID_TEST_STRATEGIES[flags.testStrategy] : undefined,
       },
+      flags.intent !== undefined && flags.intent.trim() !== "" ? flags.intent : null,
     );
     return;
   }
@@ -15515,6 +15518,7 @@ function ensureSingleStageStarted(
   scope: string,
   typed: SingleRunSettings,
   record: { prefix: string | null; codekbCtx: CodekbCtx },
+  request: string | null,
 ): { error: string } | { settings: SingleRunSettings; restarted: boolean; kept: KeptCopy | null } {
   let settings = typed;
   let restarted = false;
@@ -15554,6 +15558,17 @@ function ensureSingleStageStarted(
   // opened a single-stage attempt would move the run floor it came to read.
   if (isReadOnlyEngineProbe()) return { settings, restarted, kept };
   kept ??= keepStageFiles(projectDir, node, scope, record.prefix, record.codekbCtx);
+  // With no work there is no work's description to read: the words typed with
+  // this start are the run's own (singleRunRequest). A copy that cannot be
+  // kept leaves the run with none, and the agent asks.
+  let requestDigest: string | null = null;
+  if (request !== null && loadStateFileIfPresent(projectDir) === null) {
+    try {
+      requestDigest = keepSingleRunRequest(projectDir, node.slug, request);
+    } catch {
+      requestDigest = null;
+    }
+  }
   const error = appendSingleStageAuditEvents(projectDir, [{
     eventType: "STAGE_STARTED",
     fields: {
@@ -15565,6 +15580,7 @@ function ensureSingleStageStarted(
       ...(kept === null
         ? { [SINGLE_RUN_KEPT_FIELD]: SINGLE_RUN_NOTHING_KEPT }
         : "path" in kept ? { [SINGLE_RUN_KEPT_FIELD]: kept.path } : {}),
+      ...(requestDigest === null ? {} : { [SINGLE_RUN_REQUEST_FIELD]: requestDigest }),
     },
   }]);
   routingEvidence = null;
@@ -15579,6 +15595,7 @@ function emitSingleRunStage(
   codekbCtx: CodekbCtx,
   projectDir: string,
   settings: SingleRunSettings = {},
+  request: string | null = null,
 ): void {
   const node = nodeForSlug(slug);
   if (!node) {
@@ -15594,7 +15611,7 @@ function emitSingleRunStage(
   // An isolated run never touches the plan or the cursor, so a stage the
   // scope skips runs too when the person asks for it, with one line saying so.
   const notInPlan = !new Set(subgraphForScope(scope).map((s) => s.slug)).has(node.slug);
-  const started = ensureSingleStageStarted(projectDir, node, scope, settings, { prefix: recordPrefix, codekbCtx });
+  const started = ensureSingleStageStarted(projectDir, node, scope, settings, { prefix: recordPrefix, codekbCtx }, request);
   if ("error" in started) {
     emit(errorDirective(
       `Cannot start isolated stage "${node.slug}": ${started.error}`,
