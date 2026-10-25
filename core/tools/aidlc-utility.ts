@@ -268,6 +268,8 @@ import {
   isoTimestamp,
   isPackageJson,
   isValidRepoName,
+  repoNameProblem,
+  repoNameRefusal,
   aidlcRootIntegrations,
   codekbDir,
   intentsDir,
@@ -9459,7 +9461,7 @@ function handleIntentRepos(
     die(`Usage: aidlc-utility intent ${verb} <name>${verb === "add-repo" ? " [--url <address>] [--reason <text>] [--person-words <their words>]" : ""}`);
   }
   if (!isValidRepoName(name)) {
-    die(`intent ${verb} refused: "${name}" is not a repo name (one folder name under the workspace, no separators).`);
+    die(`intent ${verb} refused: "${name}" is not a repo name: its name ${repoNameProblem(name)}.`);
   }
   for (const flag of ["url", "reason", "person-words"]) {
     if (missingValueFlags.has(flag)) die(`intent ${verb} refused: --${flag} needs a value.`);
@@ -9711,7 +9713,7 @@ function handleIntentSetRepos(projectDir: string, list: string | undefined, all:
   if (names !== null && names.length === 0) die("Usage: aidlc-utility intent set-repos <name,...> | --all");
   for (const name of names ?? []) {
     if (!isValidRepoName(name)) {
-      die(`intent set-repos refused: "${name}" is not a repo name (one folder name under the workspace, no separators). Nothing was changed.`);
+      die(`intent set-repos refused: "${name}" is not a repo name: its name ${repoNameProblem(name)}. Nothing was changed.`);
     }
   }
   const selection = resolveWorkflowSelection(projectDir);
@@ -9739,7 +9741,7 @@ function handleIntentSetRepos(projectDir: string, list: string | undefined, all:
         if (!isGitRepoDir(repoDir(projectDir, name))) {
           die(
             `intent set-repos refused: "${name}" is not a Git checkout under the workspace folder (no .git entry at ${repoDir(projectDir, name)}). ` +
-              `Nothing was changed. To clone it and add it to this work, run \`${aidlcDispatcherInvocation(`intent add-repo ${name}`)}\`.`,
+              `Nothing was changed. To clone it and add it to this work, run \`${aidlcDispatcherInvocation(`intent add-repo ${quoteCommandArgument(name)}`)}\`.`,
           );
         }
       }
@@ -10813,7 +10815,7 @@ function resolveCodekbRepo(
     ? flags.repo
     : codekbRepoName(projectDir, space, selection.intent ?? undefined);
   if (!isValidRepoName(repo)) {
-    die(`Invalid --repo "${repo}": a repo name must be one path segment.`);
+    die(repoNameRefusal("Invalid --repo", repo));
   }
   const sourceDir = codekbSourceRoot(projectDir, repo, space);
   return {
