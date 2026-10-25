@@ -1,7 +1,8 @@
 // SubagentStop hook: Emit SUBAGENT_COMPLETED when a subagent finishes.
 //
 // Receives JSON on stdin with subagent info. Audits only while a workflow is
-// running.
+// running, or with no work while a stage run on its own is open in the space's
+// own record.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { appendAuditEntry } from "../tools/aidlc-audit.ts";
@@ -14,6 +15,7 @@ import {
   hooksHealthDir,
   writeHookStatusFile,
   isClaudeCodeHookInput,
+  isolatedRunWithoutWork,
   isoTimestamp,
   isScopedReviewCopy,
   openReviewRequests,
@@ -23,6 +25,7 @@ import {
   renderReviewFileDigests,
   resolveProjectDirFromHook,
   resolveWorkflowSelection,
+  runRecordDir,
   REVIEW_FILE_DIGEST_FIELD,
   reviewFileDigestOnDisk,
   scopedReviewCopyName,
@@ -60,20 +63,26 @@ export async function run(input: string): Promise<number> {
     completionError = errorMessage(error);
   }
 
-  let stateContent: string;
+  let stateContent: string | null;
   let selection: ReturnType<typeof resolveWorkflowSelection>;
   try {
     selection = resolveWorkflowSelection(projectDir, {
       sessionId: sessionId ?? undefined,
     });
+  } catch {
+    return 0;
+  }
+  try {
     stateContent = readFileSync(
       stateFilePathForSelection(projectDir, selection),
       "utf-8",
     );
   } catch {
+    stateContent = null;
+  }
+  if (stateContent === null ? !isolatedRunWithoutWork(projectDir, selection) : getField(stateContent, "Status") !== "Running") {
     return 0;
   }
-  if (getField(stateContent, "Status") !== "Running") return 0;
   // A conversation that has not joined this workflow records nothing in it.
   if (selection.intent !== null && workflowParticipation(projectDir, selection) !== "participant") return 0;
   // Record the completion in the workflow whose state was just read.
@@ -139,7 +148,7 @@ export async function run(input: string): Promise<number> {
   // Evidence only: a ledger or record that cannot be read leaves the row as
   // it was.
   try {
-    const record = recordDir(projectDir, intent, space);
+    const record = intent ? recordDir(projectDir, intent, space) : runRecordDir(projectDir);
     if (record !== null) {
       const digests = (openRequests ?? openReviewRequests(readAuditShardEvents(projectDir, intent, space)))
         .filter((request) => request.reviewer === agentType)
